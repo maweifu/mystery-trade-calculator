@@ -1,0 +1,417 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f4eddd">
+  <meta name="description" content="《诡秘之主》商路规划、物资交易与往返收益计算工具">
+  <title>《诡秘之主》商路收益计算器</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+  <div class="app-shell">
+
+    <!-- 顶部标题与数据管理 -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">♜</div>
+        <div class="brand-copy">
+          <h1>《诡秘之主》商路收益计算器</h1>
+          <p>TRADE ROUTE PLANNER · BEYOND THE ORDINARY</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button class="button button-secondary"
+                id="importButton" type="button">
+          <span aria-hidden="true">↑</span>
+          导入数据
+        </button>
+
+        <button class="button button-primary"
+                id="exportButton" type="button">
+          <span aria-hidden="true">↓</span>
+          导出数据
+        </button>
+
+        <input id="importFileInput"
+               type="file"
+               accept=".json,application/json"
+               hidden>
+      </div>
+    </header>
+
+    <main>
+      <!-- 地图区域 -->
+      <section class="panel map-panel" aria-labelledby="mapHeading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">WORLD MAP</p>
+            <h2 id="mapHeading">商路地图</h2>
+            <p class="section-description">
+              选择站点查看交易信息，查看道路网络与往返路线。
+            </p>
+          </div>
+
+          <div class="map-tools">
+            <span class="map-status">
+              <span class="status-dot"></span>
+              地图网络
+            </span>
+            <button id="resetMapButton"
+                    class="button button-quiet"
+                    type="button">
+              重置视图
+            </button>
+          </div>
+        </div>
+
+        <div class="map-viewport" id="mapViewport">
+          <div class="map-stage" id="mapStage">
+
+            <!-- 原始地图底图 -->
+            <img
+              class="map-background"
+              id="mapBackground"
+              src="./assets/横向贸易站点地图.jpg"
+              alt="商路区域原始地图"
+              draggable="false"
+            >
+
+            <!-- SVG 道路和站点覆盖层 -->
+            <svg
+              class="map-overlay"
+              id="mapOverlay"
+              viewBox="0 0 1000 505.25"
+              preserveAspectRatio="none"
+              role="group"
+              aria-label="地图道路网络与交互站点"
+            >
+              <g id="roadLayer" aria-label="道路网络">
+                <!-- 后续由 app.js 绘制真实道路 -->
+              </g>
+
+              <g id="highlightRouteLayer"
+                 aria-label="当前选中路线">
+                <!-- 后续显示推荐路线 -->
+              </g>
+
+              <g id="stationLayer" aria-label="地图站点">
+                <!-- 后续由 app.js 创建站点与名称 -->
+              </g>
+            </svg>
+
+          </div>
+        </div>
+
+        <div class="map-footer">
+          <div class="map-legend">
+            <span class="legend-item">
+              <i class="legend-line legend-road"></i>
+              普通道路
+            </span>
+            <span class="legend-item">
+              <i class="legend-line legend-route"></i>
+              当前路线
+            </span>
+            <span class="legend-item">
+              <i class="legend-station"></i>
+              普通站点
+            </span>
+            <span class="legend-item">
+              <i class="legend-station legend-station-active"></i>
+              选中站点
+            </span>
+          </div>
+
+          <p class="map-hint">
+            道路连接以校对后的网络数据为准
+          </p>
+        </div>
+      </section>
+
+      <!-- 功能导航 -->
+      <nav class="tab-bar" aria-label="功能导航">
+        <button class="tab-button is-active"
+                id="tab-station"
+                type="button"
+                data-tab="station"
+                aria-selected="true">
+          <span class="tab-icon" aria-hidden="true">⌖</span>
+          站点信息
+        </button>
+
+        <button class="tab-button"
+                id="tab-calculator"
+                type="button"
+                data-tab="calculator"
+                aria-selected="false">
+          <span class="tab-icon" aria-hidden="true">∑</span>
+          计算收益
+        </button>
+
+        <button class="tab-button"
+                id="tab-routes"
+                type="button"
+                data-tab="routes"
+                aria-selected="false">
+          <span class="tab-icon" aria-hidden="true">⇄</span>
+          推荐路线
+        </button>
+      </nav>
+
+      <!-- 功能内容区 -->
+      <section class="panel content-panel">
+
+        <!-- Tab 1：站点信息 -->
+        <div class="tab-content is-active"
+             id="panel-station"
+             role="tabpanel"
+             aria-labelledby="tab-station">
+
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">STATION DETAILS</p>
+              <h2>站点信息</h2>
+            </div>
+            <span class="tag" id="stationRegionTag">尚未选择</span>
+          </div>
+
+          <div class="station-layout">
+            <aside class="station-summary">
+              <h3 id="stationName">请选择地图站点</h3>
+              <p id="stationDescription">
+                点击地图上的站点，在这里查看交易信息。
+              </p>
+
+              <div class="station-meta">
+                <div>
+                  <span>区域</span>
+                  <strong id="stationRegion">—</strong>
+                </div>
+                <div>
+                  <span>可达站点</span>
+                  <strong id="stationConnections">—</strong>
+                </div>
+              </div>
+            </aside>
+
+            <div class="station-goods">
+              <div class="subsection-heading">
+                <div>
+                  <h3>物资与交易价格</h3>
+                  <p>编辑价格和负重后自动保存</p>
+                </div>
+                <button class="button button-secondary"
+                        id="addGoodsButton"
+                        type="button">
+                  + 添加物资
+                </button>
+              </div>
+
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>物资名称</th>
+                      <th>单件负重</th>
+                      <th>采购价</th>
+                      <th>售卖价</th>
+                      <th>交易状态</th>
+                    </tr>
+                  </thead>
+                  <tbody id="stationGoodsBody">
+                    <tr>
+                      <td colspan="5" class="empty-state">
+                        选择站点后显示物资数据
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2：收益计算 -->
+        <div class="tab-content"
+             id="panel-calculator"
+             role="tabpanel"
+             aria-labelledby="tab-calculator"
+             hidden>
+
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">PROFIT CALCULATOR</p>
+              <h2>计算收益</h2>
+            </div>
+          </div>
+
+          <form id="calculatorForm" class="form-grid">
+            <label class="form-field">
+              <span>仓库总负重</span>
+              <input id="warehouseCapacity"
+                     name="warehouseCapacity"
+                     type="number"
+                     min="0"
+                     step="any"
+                     placeholder="请输入仓库负重"
+                     required>
+            </label>
+
+            <label class="form-field">
+              <span>采购站点</span>
+              <select id="buyStation" required>
+                <option value="">请选择采购站点</option>
+              </select>
+            </label>
+
+            <label class="form-field">
+              <span>出售站点</span>
+              <select id="sellStation" required>
+                <option value="">请选择出售站点</option>
+              </select>
+            </label>
+
+            <label class="form-field">
+              <span>交易物资</span>
+              <select id="tradeGoods" required>
+                <option value="">请选择物资</option>
+              </select>
+            </label>
+
+            <label class="form-field">
+              <span>单件负重</span>
+              <input id="goodsWeight"
+                     type="number"
+                     min="0"
+                     step="any"
+                     placeholder="读取默认负重"
+                     required>
+            </label>
+
+            <label class="form-field">
+              <span>买入单价</span>
+              <input id="buyPrice"
+                     type="number"
+                     min="0"
+                     step="any"
+                     placeholder="读取采购价"
+                     required>
+            </label>
+
+            <label class="form-field">
+              <span>卖出单价</span>
+              <input id="sellPrice"
+                     type="number"
+                     min="0"
+                     step="any"
+                     placeholder="读取售卖价"
+                     required>
+            </label>
+
+            <div class="form-actions">
+              <button class="button button-primary"
+                      type="submit">
+                计算收益
+              </button>
+            </div>
+          </form>
+
+          <div class="result-panel" aria-live="polite">
+            <div class="result-item">
+              <span>可装载数量</span>
+              <strong id="resultQuantity">—</strong>
+            </div>
+            <div class="result-item">
+              <span>单件利润</span>
+              <strong id="resultUnitProfit">—</strong>
+            </div>
+            <div class="result-item result-total">
+              <span>预计交易利润</span>
+              <strong id="resultProfit">—</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3：推荐路线 -->
+        <div class="tab-content"
+             id="panel-routes"
+             role="tabpanel"
+             aria-labelledby="tab-routes"
+             hidden>
+
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">ROUTE RECOMMENDATIONS</p>
+              <h2>推荐路线</h2>
+              <p class="section-description">
+                以完整往返行程的累计利润作为主要排序标准。
+              </p>
+            </div>
+          </div>
+
+          <form id="routeForm" class="route-settings">
+            <label class="form-field">
+              <span>出发站点</span>
+              <select id="routeStart" required>
+                <option value="">请选择出发站</option>
+              </select>
+            </label>
+
+            <label class="form-field">
+              <span>仓库总负重</span>
+              <input id="routeCapacity"
+                     type="number"
+                     min="0"
+                     step="any"
+                     placeholder="请输入仓库负重"
+                     required>
+            </label>
+
+            <label class="form-field">
+              <span>路线类型</span>
+              <select id="routeType">
+                <option value="two">两站往返</option>
+                <option value="three">三站往返</option>
+                <option value="both">全部比较</option>
+              </select>
+            </label>
+
+            <div class="form-actions">
+              <button class="button button-primary"
+                      type="submit">
+                开始推荐
+              </button>
+            </div>
+          </form>
+
+          <div id="routeResults" class="route-results"
+               aria-live="polite">
+            <div class="empty-state">
+              设置出发站与仓库负重后，生成推荐路线。
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <span>THE WORLD OF MYSTERIES · TRADE ARCHIVE</span>
+      <span id="saveStatus" aria-live="polite">
+        本地数据状态：等待初始化
+      </span>
+    </footer>
+
+  </div>
+
+  <!-- 引用 data.js、storage.js、app.js -->
+  <script src="./data.js"></script>
+  <script src="./storage.js"></script>
+  <script src="./app.js"></script>
+
+</body>
+</html>
